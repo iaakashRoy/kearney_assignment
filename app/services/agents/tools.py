@@ -89,7 +89,12 @@ def retriever_tool(sub_query: str, top_k: int | None = None) -> list[dict]:
         out.append(chunk)
 
     out.sort(key=lambda c: (-c.get("_rrf_score", 0.0), c.get("_distance", 1.0)))
-    return out[:k]
+    out = out[:k]
+    logger.info(
+        "retriever_tool: vector=%d keyword=%d → fused=%d (top-%d) for sub_query=%r",
+        len(vec_hits), len(kw_hits), len(out), k, sub_query,
+    )
+    return out
 
 
 # ─── SQL tool ─────────────────────────────────────────────────────────────────

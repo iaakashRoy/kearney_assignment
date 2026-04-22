@@ -7,7 +7,9 @@ of questions:
 | Endpoint              | Purpose                                                           |
 | --------------------- | ----------------------------------------------------------------- |
 | `POST /query/structured`  | Natural-language → SQL over the relational catalog.           |
+| `POST /query/structured/stream` | Same SQL agent, streamed as Server-Sent Events (proposed SQL, validation, execution, optional self-correction retry) for the live trace sidebar.|
 | `POST /query/analytical`  | LangGraph agentic pipeline: planner → tool executor (hybrid retriever + SQL tool) → reflector → synthesizer, with cited sources.|
+| `POST /query/analytical/stream` | Same agentic pipeline, but emits structured trace events over Server-Sent Events for the live “Agent Reasoning” sidebar.|
 
 The bundled React SPA (`app/web/index.html`) is served at `GET /` so the API
 ships as a single image with no separate frontend container.
@@ -108,7 +110,7 @@ kearney_assignment/
 │   │   └── routes/
 │   │       ├── health.py        ← GET /health
 │   │       ├── ingestion.py     ← POST /upload, /upload/async, GET /jobs/{id}
-│   │       ├── query.py         ← POST /query/structured, /query/analytical
+│   │       ├── query.py         ← POST /query/structured(/stream), /query/analytical(/stream)
 │   │       └── catalog.py       ← GET/DELETE /catalog, GET /catalog/source
 │   │
 │   ├── services/
@@ -270,6 +272,51 @@ sequenceDiagram
 * **Synthesizer LLM down** → returns `confidence="none"` with a clear `grounding_warning`.
 * **No relevant chunks** → answer is prefixed with *"The requested information is not present in the ingested corpus."* and `confidence="none"`.
 * **Weak evidence** → `confidence="low"` plus `grounding_warning="Partial evidence only — answer may be incomplete"`.
+
+### 4.1 Live trace (logging + SSE sidebar)
+
+Every node calls both `logger.info(...)` and `emit(event, **payload)`
+([`app/services/agents/trace.py`](app/services/agents/trace.py)). The emitter is
+a `ContextVar`-bound callback — a no-op outside an HTTP context, so the regular
+`POST /query/analytical` and `POST /query/structured` endpoints pay no overhead.
+
+`POST /query/analytical/stream` and `POST /query/structured/stream` install an
+emitter that pushes each event to an `asyncio.Queue`; the route returns a
+`text/event-stream` response that serialises the queue as Server-Sent Events.
+
+**Analytical pipeline events:**
+
+| SSE event              | Payload (excerpt)                                                  |
+| ---------------------- | ------------------------------------------------------------------ |
+| `run.start`            | `{ qid, question, max_hops }`                                      |
+| `planner.plan`         | `{ rationale, sub_queries[], use_retriever, use_sql, sql_question }` |
+| `node.start`/`done`    | `{ node, qid, hop?, elapsed_ms? }`                                 |
+| `executor.tool`        | `{ tool: "retriever"\|"sql"\|"components", chunks/rows, top_*, sql }` |
+| `reflector.verdict`    | `{ sufficient, missing, next_sub_queries[] }`                      |
+| `synthesizer.reasoning`| `{ reasoning }` (chain-of-thought)                                 |
+| `synthesizer.answer`   | `{ answer, confidence, sources, grounding_warning }`               |
+| `run.done`             | `{ elapsed_ms, iterations, confidence, sources, final }`           |
+
+**SQL agent events** (one entry per LLM attempt; up to 2 attempts due to the
+self-correction retry loop):
+
+| SSE event              | Payload (excerpt)                                                  |
+| ---------------------- | ------------------------------------------------------------------ |
+| `run.start`            | `{ qid, question, mode: "structured" }`                            |
+| `node.start`           | `{ node: "sql_agent", attempt, attempt_label, prior_error? }`      |
+| `sql.proposed`         | `{ attempt, sql, assumption }`                                     |
+| `sql.validated`        | `{ attempt }`                                                      |
+| `sql.executed`         | `{ attempt, rows, elapsed_ms, columns[] }`                         |
+| `sql.error`            | `{ attempt, stage: "validation"\|"execution"\|"llm", error, sql? }`|
+| `node.done`            | `{ attempt, elapsed_ms, error? }`                                  |
+| `run.done`             | `{ elapsed_ms, attempts, rows, final }`                            |
+
+The SPA's **Agent Reasoning sidebar** (`app/web/index.html` → `useTraceStream`
+hook + `TraceSidebar` component) consumes either stream via `fetch` +
+`ReadableStream` and renders each event as a colour-coded card so the user can
+watch the multi-hop reasoning (or the SQL self-correction loop) unfold in real
+time alongside the final answer. The sidebar collapses to a vertical "Show
+trace" toggle on the right edge so the answer panel remains uncluttered.
 
 The UI then calls `GET /catalog/source?file=…&page=…` per source to render an
 inline preview (PDF page → PNG via pypdfium2, or the original image bytes).
