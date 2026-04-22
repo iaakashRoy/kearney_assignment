@@ -84,8 +84,7 @@ graph TB
 ## 2. Folder Layout
 
 ```
-platform/
-├── main.py                      ← uvicorn entry point  (re-exports app.main.app)
+kearney_assignment/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -546,17 +545,14 @@ erDiagram
 ## 7. Project File Tree
 
 ```
-platform/
-├── main.py                          ← uvicorn entry point  (imports app.main.app)
-├── index.html                       ← React SPA  (served by FastAPI at /)
-├── schema.sql                       ← SQLite DDL (documents, entities, components)
+kearney_assignment/
 ├── requirements.txt                 ← Python dependencies
 ├── Dockerfile                       ← Single-image build: api + bundled UI
 ├── docker-compose.yml               ← api service
 ├── .env.example                     ← environment variable template
 │
 ├── app/
-│   ├── main.py                      ← FastAPI factory + async lifespan
+│   ├── main.py                      ← FastAPI factory + async lifespan (uvicorn entry: app.main:app)
 │   ├── config.py                    ← Pydantic Settings (env-driven)
 │   │
 │   ├── core/

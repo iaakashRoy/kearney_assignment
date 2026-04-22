@@ -29,7 +29,6 @@ runs as a single image.
 Copy the template and fill in your Groq key:
 
 ```bash
-cd platform
 cp .env.example .env
 $EDITOR .env          # set GROQ_API_KEY=...
 ```
@@ -52,10 +51,10 @@ See [`.env.example`](.env.example) for the full list.
 
 ## 3. Run with Docker (recommended)
 
-From the repository root (one level above `platform/`):
+From the repository root:
 
 ```bash
-docker compose -f platform/docker-compose.yml up --build
+docker compose up --build
 ```
 
 That builds one image and starts a single `api` service on port **8000**.
@@ -66,18 +65,17 @@ Open the UI at:
 
 > **<http://localhost:8000/>**
 
-Stop with `Ctrl+C` (or `docker compose -f platform/docker-compose.yml down`).
+Stop with `Ctrl+C` (or `docker compose down`).
 
 ---
 
 ## 4. Run locally (no Docker)
 
 ```bash
-cd platform
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 First launch downloads the Docling layout models (~300 MB) and the
@@ -130,8 +128,7 @@ OpenAPI docs are auto-generated at **<http://localhost:8000/docs>**.
 ## 7. Project layout
 
 ```
-platform/
-├── main.py                  ← uvicorn entry (re-exports app.main.app)
+kearney_assignment/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -159,7 +156,6 @@ platform/
 ## 8. Tests
 
 ```bash
-cd platform
 source .venv/bin/activate
 pip install pytest
 pytest -q

@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY platform/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Purge any stale HuggingFace / Docling model cache that may have been
@@ -21,7 +21,7 @@ RUN rm -rf /root/.cache/huggingface /root/.cache/docling /tmp/* /var/tmp/*
 # Pre-warm Docling layout models (~300 MB, cached in this layer)
 RUN python -c "from docling.document_converter import DocumentConverter; DocumentConverter()"
 
-COPY platform/ .
+COPY . .
 
 # Remove any stray DB / vector-store / source files that may have been
 # committed to the build context. Runtime data lives on the mounted
@@ -32,4 +32,4 @@ RUN rm -rf /app/data/*.db /app/data/*.db-journal /app/data/*.sqlite \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
