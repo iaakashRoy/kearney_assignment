@@ -1,115 +1,32 @@
 """
-Natural-language → SQL agent with validation and one-shot self-correction retry.
+End-to-end runner: question → SQL → validate → execute → response.
+
+Self-corrects once if the first attempt is rejected by the validator or by
+SQLite at execution time.
 """
 from __future__ import annotations
 
-import json
-import re
 import sqlite3
-
-import sqlparse
+import time
+import uuid
 
 from app.core.exceptions import LLMError, SQLValidationError
 from app.core.logging import get_logger
 from app.db import sqlite as db
 from app.models.schemas import StructuredQueryResponse
 from app.services.agents.trace import emit
-from app.services.llm import generate_text
-from app.utils.text import extract_json
+from app.services.sql_agent.prompts import call_llm
+from app.services.sql_agent.validation import validate_sql
 
 logger = get_logger(__name__)
 
-_BLOCKED_PATTERN = re.compile(
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|REPLACE|ATTACH|DETACH|PRAGMA)\b",
-    re.IGNORECASE,
-)
-
-_SYSTEM_PROMPT = """\
-You are an expert SQLite query generator for a document intelligence platform.
-
-Schema:
-{schema}
-
-Sample rows:
-{samples}
-
-Rules:
-- Return ONLY a valid SQLite SELECT statement — no markdown fences, no explanation.
-- Use only tables and columns present in the schema.
-- If the question is ambiguous (e.g. "latest"), make a reasonable assumption and explain it.
-- Never use INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE.
-
-Respond with a JSON object:
-{{
-  "sql": "<SELECT statement>",
-  "assumption": null | "<explanation if you made an assumption>"
-}}\
-"""
-
-
-# ─── SQL validation ───────────────────────────────────────────────────────────
-
-def _validate_sql(sql: str) -> None:
-    """
-    Raise SQLValidationError if the SQL contains disallowed statements or is unparseable.
-    """
-    if not sql:
-        raise SQLValidationError("LLM returned empty SQL")
-    if _BLOCKED_PATTERN.search(sql):
-        raise SQLValidationError(f"Disallowed statement in generated SQL: {sql[:120]!r}")
-    try:
-        parsed = sqlparse.parse(sql)
-        if not parsed or not parsed[0].tokens:
-            raise SQLValidationError("SQL appears empty after parsing")
-    except SQLValidationError:
-        raise
-    except Exception as exc:
-        raise SQLValidationError(f"SQL parse error: {exc}") from exc
-
-
-# ─── LLM call ─────────────────────────────────────────────────────────────────
-
-def _call_llm(
-    question: str,
-    prior_sql: str | None = None,
-    prior_error: str | None = None,
-) -> dict:
-    schema = db.get_schema_ddl()
-    samples = json.dumps(db.get_sample_rows(3), indent=2, default=str)
-    system_msg = _SYSTEM_PROMPT.format(schema=schema, samples=samples)
-
-    parts = [f"Question: {question}"]
-    if prior_sql and prior_error:
-        parts.append(
-            f"\nPrevious attempt failed.\n"
-            f"SQL: {prior_sql}\n"
-            f"Error: {prior_error}\n"
-            f"Please correct the SQL and retry."
-        )
-
-    raw = generate_text(system_msg + "\n\n" + "\n".join(parts), max_tokens=1024)
-    result = extract_json(raw)
-
-    if not result or "sql" not in result:
-        # Fallback: grab any SELECT from the raw text
-        sql_match = re.search(r"SELECT\b.*", raw, re.IGNORECASE | re.DOTALL)
-        result = {
-            "sql": sql_match.group().strip() if sql_match else "",
-            "assumption": None,
-        }
-    return result
-
-
-# ─── Public entry point ───────────────────────────────────────────────────────
 
 def structured_query(question: str) -> StructuredQueryResponse:
     """
     Translate *question* to SQL, validate, execute, and return results.
-    Automatically retries once with error context on validation or execution failure.
+    Automatically retries once with error context on validation or execution
+    failure.
     """
-    import time
-    import uuid
-
     qid = uuid.uuid4().hex[:8]
     t0 = time.perf_counter()
     logger.info("[%s] ═══ structured_query start ═══ question=%r", qid, question[:200])
@@ -127,7 +44,7 @@ def structured_query(question: str) -> StructuredQueryResponse:
              prior_error=error)
         t_attempt = time.perf_counter()
         try:
-            llm_response = _call_llm(question, sql, error)
+            llm_response = call_llm(question, sql, error)
             sql = llm_response.get("sql", "").strip()
             assumption = llm_response.get("assumption")
             logger.info("[%s]   LLM proposed SQL: %s", qid, sql[:200])
@@ -136,7 +53,7 @@ def structured_query(question: str) -> StructuredQueryResponse:
             emit("sql.proposed", qid=qid, attempt=attempt + 1,
                  sql=sql, assumption=assumption)
 
-            _validate_sql(sql)
+            validate_sql(sql)
             emit("sql.validated", qid=qid, attempt=attempt + 1)
             logger.info("[%s]   validation     : OK (no disallowed statements)", qid)
 

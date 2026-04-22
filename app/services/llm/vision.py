@@ -1,89 +1,18 @@
 """
-Groq LLM client — text generation and vision inference.
-
-All public functions raise LLMError on failure (after exhausting retries).
+Vision endpoints — OCR and component classification.
 """
 from __future__ import annotations
-
-import logging
-import os
-from functools import lru_cache
-
-import groq
-from tenacity import (
-    before_sleep_log,
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from app.config import settings
 from app.core.exceptions import LLMError
 from app.core.logging import get_logger
+from app.services.llm.client import RETRIABLE_ERRORS, get_groq_client, with_retry
 from app.utils.text import extract_json, image_to_data_url
 
 logger = get_logger(__name__)
 
-_RETRIABLE_ERRORS = (
-    groq.APIConnectionError,
-    groq.RateLimitError,
-    groq.InternalServerError,
-)
 
-
-@lru_cache(maxsize=1)
-def get_groq_client() -> groq.Groq:
-    api_key = settings.groq_api_key or os.environ.get("GROQ_API_KEY", "")
-    if not api_key:
-        raise LLMError("GROQ_API_KEY is not configured")
-    return groq.Groq(api_key=api_key)
-
-
-# ─── Text generation ──────────────────────────────────────────────────────────
-
-def generate_text(prompt: str, max_tokens: int = 1024) -> str:
-    """Call Groq text model and return the full response string."""
-
-    @retry(
-        retry=retry_if_exception_type(_RETRIABLE_ERRORS),
-        stop=stop_after_attempt(settings.llm_max_retries),
-        wait=wait_exponential(
-            multiplier=1,
-            min=settings.llm_retry_min_wait,
-            max=settings.llm_retry_max_wait,
-        ),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True,
-    )
-    def _call() -> str:
-        client = get_groq_client()
-        kwargs: dict = dict(
-            model=settings.groq_text_model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6,
-            max_completion_tokens=max_tokens,
-            top_p=0.95,
-            stream=True,
-        )
-        # gpt-oss is a reasoning model — minimise reasoning tokens so the
-        # full token budget is available for the actual JSON answer.
-        if "gpt-oss" in settings.groq_text_model:
-            kwargs["reasoning_effort"] = "low"
-        completion = client.chat.completions.create(**kwargs)
-        return "".join(chunk.choices[0].delta.content or "" for chunk in completion)
-
-    try:
-        return _call()
-    except _RETRIABLE_ERRORS as exc:
-        raise LLMError(f"Text generation failed after retries: {exc}") from exc
-    except LLMError:
-        raise
-    except Exception as exc:
-        raise LLMError(f"Unexpected LLM error: {exc}") from exc
-
-
-# ─── Vision: OCR ──────────────────────────────────────────────────────────────
+# ─── OCR ──────────────────────────────────────────────────────────────────────
 
 def ocr_image(image_bytes: bytes, suffix: str = ".jpg") -> tuple[str, str]:
     """
@@ -96,17 +25,7 @@ def ocr_image(image_bytes: bytes, suffix: str = ".jpg") -> tuple[str, str]:
     """
     data_url = image_to_data_url(image_bytes, suffix)
 
-    @retry(
-        retry=retry_if_exception_type(_RETRIABLE_ERRORS),
-        stop=stop_after_attempt(settings.llm_max_retries),
-        wait=wait_exponential(
-            multiplier=1,
-            min=settings.llm_retry_min_wait,
-            max=settings.llm_retry_max_wait,
-        ),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True,
-    )
+    @with_retry
     def _call():
         client = get_groq_client()
         return client.chat.completions.create(
@@ -143,7 +62,7 @@ def ocr_image(image_bytes: bytes, suffix: str = ".jpg") -> tuple[str, str]:
 
     try:
         completion = _call()
-    except _RETRIABLE_ERRORS as exc:
+    except RETRIABLE_ERRORS as exc:
         raise LLMError(f"Vision OCR failed after retries: {exc}") from exc
     except LLMError:
         raise
@@ -156,7 +75,7 @@ def ocr_image(image_bytes: bytes, suffix: str = ".jpg") -> tuple[str, str]:
     return "scanned_doc", extracted
 
 
-# ─── Vision: component classification ────────────────────────────────────────
+# ─── Component classification ────────────────────────────────────────────────
 
 _CLASSIFY_PROMPT = (
     "You are an automotive seat component analyst. Examine this image and classify the component.\n"
@@ -177,17 +96,7 @@ def classify_component_image(image_bytes: bytes, suffix: str = ".jpg") -> dict:
     """Classify a component photo via Groq vision. Returns a raw dict."""
     data_url = image_to_data_url(image_bytes, suffix)
 
-    @retry(
-        retry=retry_if_exception_type(_RETRIABLE_ERRORS),
-        stop=stop_after_attempt(settings.llm_max_retries),
-        wait=wait_exponential(
-            multiplier=1,
-            min=settings.llm_retry_min_wait,
-            max=settings.llm_retry_max_wait,
-        ),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True,
-    )
+    @with_retry
     def _call():
         client = get_groq_client()
         return client.chat.completions.create(
@@ -207,7 +116,7 @@ def classify_component_image(image_bytes: bytes, suffix: str = ".jpg") -> dict:
 
     try:
         completion = _call()
-    except _RETRIABLE_ERRORS as exc:
+    except RETRIABLE_ERRORS as exc:
         raise LLMError(f"Component classification failed after retries: {exc}") from exc
     except LLMError:
         raise
