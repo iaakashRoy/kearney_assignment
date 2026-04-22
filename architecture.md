@@ -7,7 +7,7 @@ of questions:
 | Endpoint              | Purpose                                                           |
 | --------------------- | ----------------------------------------------------------------- |
 | `POST /query/structured`  | Natural-language → SQL over the relational catalog.           |
-| `POST /query/analytical`  | Hybrid (vector + keyword) RAG with cited sources.             |
+| `POST /query/analytical`  | LangGraph agentic pipeline: planner → tool executor (hybrid retriever + SQL tool) → reflector → synthesizer, with cited sources.|
 
 The bundled React SPA (`app/web/index.html`) is served at `GET /` so the API
 ships as a single image with no separate frontend container.
@@ -33,7 +33,9 @@ graph TB
     subgraph Services["Service Layer · app/services/"]
         IS["ingestion.py<br/>extract → chunk → embed → persist"]
         JM["job_manager.py<br/>ProcessPoolExecutor"]
-        RA["rag.py<br/>hybrid retrieval + RRF + LLM"]
+        RA["rag.py<br/>thin wrapper → agents/"]
+        AG["agents/graph.py<br/>LangGraph: planner →<br/>executor → reflector →<br/>synthesizer"]
+        TL["agents/tools.py<br/>retriever_tool · sql_tool ·<br/>components_tool"]
         SA["sql_agent.py<br/>NL → SQL"]
         LLM["llm.py<br/>Groq client (text + vision)"]
         EMB["embedding.py<br/>SentenceTransformer"]
@@ -69,10 +71,13 @@ graph TB
     IS --> VS
     IS --> FS
     IS --> DL
-    RA --> EMB
-    RA --> VS
-    RA --> SQ
-    RA --> LLM
+    RA --> AG
+    AG --> TL
+    AG --> LLM
+    TL --> EMB
+    TL --> VS
+    TL --> SQ
+    TL --> SA
     SA --> SQ
     SA --> LLM
     LLM --> GROQ
@@ -109,10 +114,14 @@ kearney_assignment/
 │   ├── services/
 │   │   ├── ingestion.py         ← orchestrates extract → chunk → embed → persist
 │   │   ├── job_manager.py       ← async ProcessPoolExecutor for /upload/async
-│   │   ├── rag.py               ← hybrid retrieval + RRF + LLM reasoning
+│   │   ├── rag.py               ← thin wrapper → agents.run_analytical_query
 │   │   ├── sql_agent.py         ← NL → SQL with read-only guardrails
 │   │   ├── llm.py               ← Groq text + vision client (tenacity retry)
-│   │   └── embedding.py         ← SentenceTransformer wrapper
+│   │   ├── embedding.py         ← SentenceTransformer wrapper
+│   │   └── agents/              ← LangGraph agentic pipeline
+│   │       ├── graph.py         ← state machine (planner → executor → reflector → synthesizer)
+│   │       ├── tools.py         ← retriever_tool · sql_tool · components_tool
+│   │       └── prompts.py       ← Chain-of-Thought prompts per agent
 │   │
 │   ├── db/
 │   │   ├── sqlite.py            ← connections, migrations, CRUD, FTS5
@@ -144,7 +153,8 @@ kearney_assignment/
 Each layer depends only on layers below it:
 
 ```
-api  →  services  →  {db, llm, embedding}  →  config / core
+api  →  services  →  {agents, db, llm, embedding}  →  config / core
+agents  →  {tools (retriever_tool, sql_tool, components_tool), llm}
 ```
 
 ---
@@ -194,32 +204,72 @@ sequenceDiagram
 
 ## 4. Analytical Query Flow (`POST /query/analytical`)
 
+The pipeline is implemented as a **LangGraph state machine** in
+[`app/services/agents/graph.py`](app/services/agents/graph.py) with four
+nodes that each have a single responsibility:
+
+| Node            | Role                                                                           |
+| --------------- | ------------------------------------------------------------------------------ |
+| `planner`       | LLM (CoT) — decomposes the question into 1–3 sub-queries and chooses tools.    |
+| `tool_executor` | Calls `retriever_tool` (per sub-query) and, if planned, `sql_tool`.            |
+| `reflector`     | LLM critic — decides whether evidence suffices or proposes a 2nd retrieval hop.|
+| `synthesizer`   | LLM (CoT) — produces the grounded answer + citations + confidence label.       |
+
+Tools (in [`app/services/agents/tools.py`](app/services/agents/tools.py)):
+
+* `retriever_tool(sub_query)` — hybrid vector + BM25 retrieval fused with RRF.
+* `sql_tool(question)` — wraps the existing NL→SQL agent for structured lookups.
+* `components_tool()` — full component catalog (small).
+
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client
     participant API as routes/query.py
-    participant RAG as services/rag.py
-    participant EMB as services/embedding.py
-    participant VS as db/vector_store.py
-    participant SQ as db/sqlite.py
-    participant LLM as services/llm.py
+    participant G as agents/graph.py
+    participant P as planner (LLM)
+    participant T as tool_executor
+    participant RT as retriever_tool<br/>(vector + BM25 + RRF)
+    participant ST as sql_tool
+    participant R as reflector (LLM)
+    participant S as synthesizer (LLM)
 
     Client->>API: { question }
-    API->>RAG: reason(question)
-    RAG->>EMB: encode(question)
-    par vector search
-        RAG->>VS: search(embedding, top_k)
-    and keyword search
-        RAG->>SQ: keyword_search_chunks(question)
+    API->>G: run_analytical_query(question)
+    G->>P: plan(question)
+    P-->>G: { sub_queries[], use_retriever, use_sql, sql_question }
+    G->>T: execute(plan)
+    par per sub-query
+        T->>RT: retriever_tool(sub_q)
+    and (optional)
+        T->>ST: sql_tool(sql_question)
     end
-    RAG->>RAG: RRF fuse (k=60)
-    RAG->>LLM: prompt(chunks_with_pages)
-    LLM-->>RAG: answer + cited sources
-    RAG->>RAG: attach page_number per source from retrieval
-    RAG-->>API: AnalyticalQueryResponse
-    API-->>Client: { answer, sources[{ file, page, excerpt, score }] }
+    RT-->>T: ranked chunks (RRF)
+    ST-->>T: rows / sql / error
+    T-->>G: retrievals + sql_attempts
+    G->>R: reflect(question, evidence)
+    alt sufficient
+        R-->>G: { sufficient: true }
+    else needs another hop
+        R-->>G: { next_sub_queries[] }
+        G->>T: execute(new sub_queries)
+    end
+    G->>S: synthesize(all evidence)
+    S-->>G: answer + reasoning + sources
+    G->>G: override confidence from real retrieval distances
+    G-->>API: AnalyticalQueryResponse (+ plan, iterations, sql_used)
+    API-->>Client: { answer, reasoning, sources[{file,page,excerpt,score}], confidence, plan, iterations, sql_used }
 ```
+
+**Fault-tolerance** — every node degrades gracefully:
+
+* **Planner LLM down** → falls back to a single-hop plan with the original question.
+* **Retriever failure** (vector or keyword) → other modality still surfaces evidence; per-tool error captured in `errors`.
+* **SQL tool failure** → captured in `sql_attempts[*].response.error`; synthesis continues without it.
+* **Reflector LLM down** → assumes evidence is sufficient and proceeds to synthesis.
+* **Synthesizer LLM down** → returns `confidence="none"` with a clear `grounding_warning`.
+* **No relevant chunks** → answer is prefixed with *"The requested information is not present in the ingested corpus."* and `confidence="none"`.
+* **Weak evidence** → `confidence="low"` plus `grounding_warning="Partial evidence only — answer may be incomplete"`.
 
 The UI then calls `GET /catalog/source?file=…&page=…` per source to render an
 inline preview (PDF page → PNG via pypdfium2, or the original image bytes).

@@ -10,16 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# BuildKit cache mount keeps the pip download cache across rebuilds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
-# Purge any stale HuggingFace / Docling model cache that may have been
-# inherited from a parent image layer before pre-warming fresh copies.
-# This avoids the "storage has wrong byte size" safetensors mismatch that
-# occurs when a cached config and weights drift out of sync across versions.
-RUN rm -rf /root/.cache/huggingface /root/.cache/docling /tmp/* /var/tmp/*
-
-# Pre-warm Docling layout models (~300 MB, cached in this layer)
-RUN python -c "from docling.document_converter import DocumentConverter; DocumentConverter()"
+# Purge any stale model cache inherited from a parent image layer, then
+# pre-warm Docling layout models (~300 MB) — both in one layer so the
+# downloaded weights are committed and the purge is not a wasted layer.
+RUN rm -rf /root/.cache/huggingface /root/.cache/docling /tmp/* /var/tmp/* && \
+    python -c "from docling.document_converter import DocumentConverter; DocumentConverter()"
 
 COPY . .
 

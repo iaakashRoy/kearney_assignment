@@ -95,6 +95,10 @@ class AnalyticalQueryResponse(BaseModel):
     sources: list[SourceReference] = Field(default_factory=list)
     confidence: str  # high | medium | low | none
     grounding_warning: str | None = None
+    # ── Agentic-pipeline transparency (LangGraph) ─────────────────────────────
+    plan: list[str] | None = None        # sub-queries the planner produced
+    iterations: int | None = None        # number of retrieval hops actually run
+    sql_used: bool | None = None         # whether the sql_tool was invoked
 
 
 class StructuredQueryResponse(BaseModel):
