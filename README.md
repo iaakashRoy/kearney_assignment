@@ -19,7 +19,7 @@ runs as a single image.
 | Tool          | Version     | Notes                                          |
 | ------------- | ----------- | ---------------------------------------------- |
 | Python        | 3.11+       | For running locally without Docker.            |
-| Docker        | 24+         | Includes Docker Compose v2 (`docker compose`). |
+| Docker        | 24+         | For containerized runs.                        |
 | Groq API key  | —           | Free tier at <https://console.groq.com/keys>.  |
 
 ---
@@ -51,13 +51,23 @@ See [`.env.example`](.env.example) for the full list.
 
 ## 3. Run with Docker (recommended)
 
-From the repository root:
+From the repository root, build the image:
 
 ```bash
-docker compose up --build
+docker build -t kearney-platform .
 ```
 
-That builds one image and starts a single `api` service on port **8000**.
+Then run it, mounting `./data/` for persistence and passing your `.env`:
+
+```bash
+docker run --rm -it \
+  --env-file .env \
+  -p 8000:8000 \
+  -v "$(pwd)/data:/data" \
+  --name kearney-platform \
+  kearney-platform
+```
+
 Local `./data/` is mounted at `/data/` inside the container so SQLite,
 LanceDB, and uploaded source files survive container restarts.
 
@@ -65,7 +75,7 @@ Open the UI at:
 
 > **<http://localhost:8000/>**
 
-Stop with `Ctrl+C` (or `docker compose down`).
+Stop with `Ctrl+C` (the `--rm` flag cleans up the container).
 
 ---
 
@@ -130,7 +140,6 @@ OpenAPI docs are auto-generated at **<http://localhost:8000/docs>**.
 ```
 kearney_assignment/
 ├── Dockerfile
-├── docker-compose.yml
 ├── requirements.txt
 ├── README.md
 ├── architecture.md
