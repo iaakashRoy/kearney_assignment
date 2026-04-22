@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc/
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Local data stores (regenerated on ingest)
+platform.db
+platform.db-journal
+platform.db-shm
+platform.db-wal
+platform_lancedb/
+platform_sources/
+data/
+*.db
+*.sqlite
+# Editor / OS noise
+.DS_Store
+.vscode/
+.idea/

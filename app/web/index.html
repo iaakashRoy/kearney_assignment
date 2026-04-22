@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kearney PERLab — Document Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:    #0a0a0a;
+      --white:    #ffffff;
+      --gray-50:  #fafafa;
+      --gray-100: #f4f4f4;
+      --gray-200: #e8e8e8;
+      --gray-400: #9a9a9a;
+      --gray-600: #555555;
+      --gray-800: #222222;
+      --red:      #cc0000;
+      --green:    #1a6e2e;
+      --amber:    #996600;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--white);
+      color: var(--black);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.01em;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #root { min-height: 100%; display: flex; flex-direction: column; }
+
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    .spinner {
+      border: 2px solid var(--gray-200);
+      border-top-color: var(--black);
+      border-radius: 50%;
+      width: 15px; height: 15px;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--gray-200);
+      padding: 0 48px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--white);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo-kearney {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--black);
+    }
+    .logo-perlab {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      margin-left: 10px;
+    }
+    .logo-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--gray-200);
+      margin: 0 10px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--black);
+      color: var(--white);
+      padding: 44px 48px 40px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .hero-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 12px;
+    }
+    .hero-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 38px;
+      font-weight: 600;
+      line-height: 1.12;
+    }
+    .hero-title em {
+      font-style: italic;
+      font-weight: 400;
+    }
+    .hero-meta {
+      font-size: 11px;
+      color: var(--gray-600);
+      letter-spacing: 0.05em;
+      line-height: 2;
+      text-align: right;
+    }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      border-bottom: 1px solid var(--gray-200);
+      padding: 0 48px;
+      display: flex;
+      gap: 0;
+      background: var(--white);
+    }
+    .tab-btn {
+      padding: 16px 26px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: var(--gray-400);
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--black); }
+    .tab-btn.active {
+      color: var(--black);
+      font-weight: 600;
+      border-bottom-color: var(--black);
+    }
+
+    /* ── Main content ── */
+    main {
+      flex: 1;
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 56px 56px;
+    }
+
+    .panel-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 30px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .panel-sub {
+      font-size: 15px;
+      color: var(--gray-400);
+      margin-bottom: 32px;
+    }
+
+    /* ── Inputs ── */
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--gray-200);
+      border-radius: 0;
+      padding: 15px 18px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 300;
+      font-size: 16px;
+      color: var(--black);
+      background: var(--white);
+      outline: none;
+      transition: border-color 0.2s;
+      display: block;
+      margin-bottom: 16px;
+    }
+    input[type="text"]:focus { border-color: var(--black); }
+    input[type="text"]::placeholder { color: var(--gray-400); }
+
+    /* ── Pills ── */
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .pill {
+      border: 1px solid var(--gray-200);
+      background: var(--white);
+      color: var(--gray-600);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .pill:hover { border-color: var(--black); color: var(--black); }
+
+    /* ── Primary button ── */
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 16px 24px;
+      background: var(--black);
+      color: var(--white);
+      border: 1px solid var(--black);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-top: 8px;
+    }
+    .btn-primary:hover { opacity: 0.82; }
+    .btn-primary:disabled { opacity: 0.28; cursor: not-allowed; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 1px dashed var(--gray-400);
+      padding: 52px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 20px;
+    }
+    .drop-zone:hover, .drop-zone.dragging { border-color: var(--black); background: var(--gray-50); }
+    .drop-zone-main { font-size: 15px; color: var(--gray-600); margin-bottom: 8px; }
+    .drop-zone-sub { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gray-400); }
+
+    /* ── File list ── */
+    .file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--gray-100);
+      font-size: 15px;
+    }
+    .file-remove {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin-left: 12px;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+    .file-remove:hover { color: var(--red); }
+
+    /* ── Alerts ── */
+    .alert {
+      padding: 14px 16px;
+      font-size: 15px;
+      margin-top: 16px;
+      border-left: 3px solid;
+    }
+    .alert-success { border-color: var(--black); background: var(--gray-50); color: var(--gray-800); }
+    .alert-error   { border-color: var(--red);   background: #fff5f5;         color: var(--red); }
+    .alert-warning { border-color: var(--amber);  background: #fffbf0;         color: var(--amber); }
+    .alert-info    { border-color: var(--gray-400); background: var(--gray-50); color: var(--gray-800); }
+
+    /* ── Badge ── */
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+    }
+
+    /* ── Details / accordion ── */
+    details { border-bottom: 1px solid var(--gray-100); }
+    details > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 0;
+      font-size: 15px;
+      user-select: none;
+    }
+    details > summary::-webkit-details-marker { display: none; }
+    .summ-arrow { color: var(--gray-400); font-size: 12px; margin-left: auto; flex-shrink: 0; }
+    details[open] .summ-arrow::before { content: '−'; }
+    .summ-arrow::before { content: '+'; }
+    .detail-body { padding: 10px 0 18px 22px; font-size: 14px; color: var(--gray-600); line-height: 1.65; }
+
+    /* ── Label ── */
+    .label {
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+
+    /* ── SQL block ── */
+    .sql-block {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      padding: 16px 18px;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+      color: var(--gray-800);
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    /* ── Results table ── */
+    .result-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+    .result-table th {
+      padding: 12px 14px;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-bottom: 2px solid var(--black);
+      white-space: nowrap;
+    }
+    .result-table td { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); color: var(--gray-800); }
+    .result-table tr:nth-child(even) td { background: var(--gray-50); }
+    .table-wrap { overflow-x: auto; margin-bottom: 8px; }
+    .table-count { font-size: 13px; color: var(--gray-400); }
+
+    /* ── Answer card ── */
+    .answer-card {
+      border-left: 3px solid var(--black);
+      padding-left: 18px;
+      margin-top: 4px;
+    }
+    .answer-text { font-size: 16px; line-height: 1.85; color: var(--gray-800); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--gray-200);
+      padding: 20px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .footer-copy { font-size: 11px; color: var(--gray-400); letter-spacing: 0.06em; }
+    .footer-api  { font-size: 11px; color: #c8c8c8; font-family: 'Courier New', monospace; }
+
+    /* ── Confidence ── */
+    .conf-high   { color: var(--green); }
+    .conf-medium { color: var(--gray-800); }
+    .conf-low    { color: var(--amber); }
+    .conf-none   { color: var(--red); }
+
+    /* ── Progress bar ── */
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: var(--gray-100);
+      margin: 12px 0 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--black);
+      transition: width 0.3s ease;
+    }
+    .progress-meta {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 12px;
+    }
+
+    /* ── Catalog ── */
+    .catalog-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .catalog-stats { display: flex; gap: 32px; }
+    .catalog-stat { display: flex; flex-direction: column; }
+    .catalog-stat-num {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--black);
+    }
+    .catalog-stat-lbl {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+    }
+    .btn-secondary {
+      padding: 10px 18px;
+      background: var(--white);
+      color: var(--black);
+      border: 1px solid var(--gray-200);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .btn-secondary:hover { border-color: var(--black); }
+    .btn-danger {
+      padding: 10px 18px;
+      background: var(--white);
+      color: var(--red);
+      border: 1px solid var(--red);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-danger:hover:not(:disabled) { background: var(--red); color: var(--white); }
+    .btn-danger:disabled { opacity: 0.35; cursor: not-allowed; }
+    .row-delete {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--red);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    .row-delete:hover { text-decoration: underline; }
+    .section-head {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 20px;
+      font-weight: 600;
+      margin: 24px 0 10px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px 18px;
+      font-size: 13px;
+      color: var(--gray-800);
+    }
+    .meta-grid .k {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      display: block;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--gray-600);
+    }
+
+    /* ── Source preview ── */
+    .source-preview {
+      padding: 12px 0 18px 22px;
+    }
+    .source-preview img {
+      max-width: 100%;
+      max-height: 520px;
+      border: 1px solid var(--gray-200);
+      background: var(--gray-50);
+      display: block;
+      margin-bottom: 8px;
+    }
+    .source-link {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      text-decoration: none;
+      border-bottom: 1px solid var(--gray-200);
+      padding-bottom: 2px;
+    }
+    .source-link:hover { color: var(--black); border-color: var(--black); }
+
+    @media (max-width: 640px) {
+      header, .tab-bar, main, footer { padding-left: 20px; padding-right: 20px; }
+      .hero { padding: 32px 20px; }
+      .hero-title { font-size: 28px; }
+      .hero-meta { text-align: left; }
+      .tab-btn { padding: 14px 14px; font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const API = (window.API_BASE_URL || (location.protocol === "file:" ? "http://localhost:8000" : "")).replace(/\/$/, "");
+
+function Spinner() { return <span className="spinner" />; }
+
+function Alert({ type, children }) {
+  const cls = { success:"alert-success", error:"alert-error", warning:"alert-warning", info:"alert-info" };
+  return <div className={`alert ${cls[type] || "alert-info"}`}>{children}</div>;
+}
+
+function Badge({ value }) {
+  const map = {
+    ok:         { bg:"#0a0a0a", color:"#fff" },
+    error:      { bg:"#cc0000", color:"#fff" },
+    skipped:    { bg:"#9a9a9a", color:"#fff" },
+    pending:    { bg:"#e8e8e8", color:"#555" },
+    processing: { bg:"#555",    color:"#fff" },
+    high:       { bg:"#0a0a0a", color:"#fff" },
+    medium:     { bg:"#555",    color:"#fff" },
+    low:        { bg:"#9a9a9a", color:"#fff" },
+    none:       { bg:"#cc0000", color:"#fff" },
+  };
+  const s = map[value] || { bg:"#e8e8e8", color:"#555" };
+  return <span className="badge" style={{ background: s.bg, color: s.color }}>{value}</span>;
+}
+
+// ── Ingest ──────────────────────────────────────────────────────────────────
+const STATUS_ICON = { pending:"·", processing:"⋯", ok:"✓", error:"✕", skipped:"—" };
+const STATUS_COLOR = {
+  pending:"#9a9a9a", processing:"#0a0a0a",
+  ok:"#1a6e2e", error:"#cc0000", skipped:"#9a9a9a",
+};
+
+function IngestTab() {
+  const [files,    setFiles]    = React.useState([]);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [job,      setJob]      = React.useState(null);   // live polled job state
+  const [error,    setError]    = React.useState(null);
+  const [dragging, setDragging] = React.useState(false);
+  const inputRef = React.useRef();
+  const pollRef  = React.useRef(null);
+
+  function addFiles(incoming) {
+    const ok = Array.from(incoming).filter(f =>
+      /\.(pdf|png|jpg|jpeg)$/i.test(f.name) ||
+      ["application/pdf","image/png","image/jpeg"].includes(f.type)
+    );
+    setFiles(prev => {
+      const names = new Set(prev.map(f => f.name));
+      return [...prev, ...ok.filter(f => !names.has(f.name))];
+    });
+  }
+  function onDrop(e) { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }
+
+  function stopPolling() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }
+  React.useEffect(() => () => stopPolling(), []);
+
+  async function ingest() {
+    if (!files.length) return;
+    setSubmitting(true); setError(null); setJob(null); stopPolling();
+
+    const fd = new FormData();
+    files.forEach(f => fd.append("files", f));
+    let jobId;
+    try {
+      const r = await fetch(`${API}/upload/async`, { method:"POST", body:fd });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      jobId = data.job_id;
+      setFiles([]);
+    } catch(e) {
+      setError(e.message);
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+
+    // Poll /jobs/{job_id} every 1.5s.
+    const tick = async () => {
+      try {
+        const r = await fetch(`${API}/jobs/${jobId}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        setJob(data);
+        if (data.done) stopPolling();
+      } catch(e) {
+        setError(e.message);
+        stopPolling();
+      }
+    };
+    tick();
+    pollRef.current = setInterval(tick, 1500);
+  }
+
+  const total     = job?.total ?? 0;
+  const completed = job?.completed ?? 0;
+  const pct       = total ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <div>
+      <p className="panel-title serif">Upload Files</p>
+      <p className="panel-sub">Accepts PDF, PNG, JPG — files are processed in parallel worker processes</p>
+
+      <div
+        className={`drop-zone${dragging?" dragging":""}`}
+        onClick={() => inputRef.current.click()}
+        onDragOver={e=>{ e.preventDefault(); setDragging(true); }}
+        onDragLeave={()=>setDragging(false)}
+        onDrop={onDrop}
+      >
+        <input ref={inputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" multiple
+          style={{display:"none"}} onChange={e=>addFiles(e.target.files)} />
+        <p className="drop-zone-main">Drag &amp; drop files here</p>
+        <p className="drop-zone-sub">or click to browse</p>
+      </div>
+
+      {files.length > 0 && (
+        <div style={{marginBottom:20}}>
+          {files.map((f,i) => (
+            <div className="file-row" key={i}>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{f.name}</span>
+              <button className="file-remove" onClick={()=>setFiles(prev=>prev.filter((_,j)=>j!==i))}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button className="btn-primary" onClick={ingest} disabled={submitting||!files.length||(job&&!job.done)}>
+        {submitting
+          ? <><Spinner/>Submitting…</>
+          : job && !job.done
+            ? <><Spinner/>Processing {completed}/{total}…</>
+            : `Ingest${files.length?` (${files.length})`:""}`}
+      </button>
+
+      {error && <Alert type="error">Request failed: {error}</Alert>}
+
+      {job && (
+        <div style={{marginTop:24}}>
+          <div className="progress-meta">
+            {job.done ? "Complete" : "Processing"} — {completed} / {total} files ({pct}%)
+            <span style={{marginLeft:12,color:"#c8c8c8",fontFamily:"'Courier New',monospace",letterSpacing:0}}>
+              job {job.job_id?.slice(0,8)}
+            </span>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{width:`${pct}%`}} />
+          </div>
+
+          <div style={{marginTop:16}}>
+            {job.files.map((f, i) => {
+              const elapsed = (f.started_at && f.finished_at)
+                ? `${(f.finished_at - f.started_at).toFixed(1)}s`
+                : f.started_at
+                  ? `${(Date.now()/1000 - f.started_at).toFixed(1)}s`
+                  : "—";
+              return (
+                <details key={i} open={f.status === "error"}>
+                  <summary>
+                    <span style={{fontWeight:600,color:STATUS_COLOR[f.status]||"#9a9a9a",width:14,textAlign:"center"}}>
+                      {f.status === "processing" ? <Spinner/> : (STATUS_ICON[f.status] || "?")}
+                    </span>
+                    <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.filename}</span>
+                    <span style={{fontSize:11,color:"#9a9a9a",marginRight:10}}>{f.input_type || "—"}</span>
+                    <span style={{fontSize:11,color:"#9a9a9a",marginRight:10,fontFamily:"'Courier New',monospace"}}>{elapsed}</span>
+                    <Badge value={f.status} />
+                    <span className="summ-arrow" />
+                  </summary>
+                  <div className="detail-body">{f.detail || "—"}</div>
+                </details>
+              );
+            })}
+          </div>
+
+          {job.done && (
+            <Alert type="success">
+              Finished — {job.files.filter(f=>f.status==="ok").length} ok ·
+              {" "}{job.files.filter(f=>f.status==="error").length} errors ·
+              {" "}{job.files.filter(f=>f.status==="skipped").length} skipped
+            </Alert>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Data Marketplace ────────────────────────────────────────────────────────
+function CatalogTab() {
+  const [data,    setData]    = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error,   setError]   = React.useState(null);
+  const [confirmWipe, setConfirmWipe] = React.useState(false);
+  const [busyId,  setBusyId]  = React.useState(null);
+  const [wiping,  setWiping]  = React.useState(false);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      const r = await fetch(`${API}/catalog`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setData(await r.json());
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function deleteOne(kind, id) {
+    const key = `${kind}-${id}`;
+    setBusyId(key); setError(null);
+    try {
+      const r = await fetch(`${API}/catalog/${kind}/${id}`, { method:"DELETE" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await load();
+    } catch(e) { setError(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  async function deleteAll() {
+    if (!confirmWipe) return;
+    setWiping(true); setError(null);
+    try {
+      const r = await fetch(`${API}/catalog`, { method:"DELETE" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setConfirmWipe(false);
+      await load();
+    } catch(e) { setError(e.message); }
+    finally { setWiping(false); }
+  }
+
+  const docs  = data?.documents  || [];
+  const comps = data?.components || [];
+  const totalChunks = docs.reduce((s, d) => s + (d.n_chunks || 0), 0);
+
+  return (
+    <div>
+      <p className="panel-title serif">Data Marketplace</p>
+      <p className="panel-sub">Browse everything that has been ingested. Selectively delete items or wipe the catalog.</p>
+
+      <div className="catalog-toolbar">
+        <div className="catalog-stats">
+          <div className="catalog-stat">
+            <span className="catalog-stat-num">{data?.total_documents ?? "—"}</span>
+            <span className="catalog-stat-lbl">Documents</span>
+          </div>
+          <div className="catalog-stat">
+            <span className="catalog-stat-num">{data?.total_components ?? "—"}</span>
+            <span className="catalog-stat-lbl">Components</span>
+          </div>
+          <div className="catalog-stat">
+            <span className="catalog-stat-num">{totalChunks}</span>
+            <span className="catalog-stat-lbl">Chunks</span>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+          <button className="btn-secondary" onClick={load} disabled={loading}>
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={confirmWipe} onChange={e=>setConfirmWipe(e.target.checked)} />
+            Confirm full wipe
+          </label>
+          <button className="btn-danger" onClick={deleteAll} disabled={!confirmWipe||wiping}>
+            {wiping ? "Wiping…" : "Delete ALL"}
+          </button>
+        </div>
+      </div>
+
+      {error && <Alert type="error">{error}</Alert>}
+
+      <p className="section-head">Documents</p>
+      {!loading && docs.length === 0 && <Alert type="info">No documents ingested yet.</Alert>}
+      {docs.map(d => {
+        const key = `document-${d.id}`;
+        const ext = (d.source_file.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+        const isImg = [".png",".jpg",".jpeg",".gif",".webp"].includes(ext);
+        const isPdf = ext === ".pdf";
+        const previewUrl = isImg
+          ? `${API}/catalog/source?file=${encodeURIComponent(d.source_file)}`
+          : isPdf
+            ? `${API}/catalog/source?file=${encodeURIComponent(d.source_file)}&page=1`
+            : null;
+        return (
+          <details key={key}>
+            <summary>
+              <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                <strong>{d.source_file}</strong>
+              </span>
+              <span style={{fontSize:11,color:"#9a9a9a",marginRight:10}}>{d.doc_type || "—"}</span>
+              <span style={{fontSize:11,color:"#9a9a9a",marginRight:10}}>{d.n_chunks} chunks · {d.n_entities} entities</span>
+              <button
+                className="row-delete"
+                onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); deleteOne("document", d.id); }}
+                disabled={busyId===key}
+              >
+                {busyId===key ? "Deleting…" : "Delete"}
+              </button>
+              <span className="summ-arrow" />
+            </summary>
+            <div className="detail-body">
+              <div className="meta-grid">
+                <div><span className="k">id</span>{d.id}</div>
+                <div><span className="k">input_type</span>{d.input_type || "—"}</div>
+                <div><span className="k">doc_type</span>{d.doc_type || "—"}</div>
+                <div><span className="k">confidence</span>{d.doc_type_confidence ?? "—"}</div>
+                <div><span className="k">secondary</span>{d.secondary_doc_type || "—"}</div>
+                <div><span className="k">relationships</span>{d.n_relationships}</div>
+                <div><span className="k">created</span>{d.created_at || "—"}</div>
+              </div>
+              {d.summary && <p style={{marginTop:12,fontStyle:"italic",color:"#555"}}>{d.summary}</p>}
+            </div>
+            {previewUrl && (
+              <div className="source-preview">
+                <img
+                  src={previewUrl}
+                  alt={`Preview of ${d.source_file}`}
+                  loading="lazy"
+                  onError={(e)=>{ e.currentTarget.style.display='none'; }}
+                />
+                <a className="source-link" href={previewUrl} target="_blank" rel="noreferrer">
+                  Open {isPdf ? "page 1" : "source"} ↗
+                </a>
+              </div>
+            )}
+          </details>
+        );
+      })}
+
+      <p className="section-head">Components</p>
+      {!loading && comps.length === 0 && <Alert type="info">No components ingested yet.</Alert>}
+      {comps.map(c => {
+        const key = `component-${c.id}`;
+        const ext = (c.source_file.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+        const isImg = [".png",".jpg",".jpeg",".gif",".webp"].includes(ext);
+        const previewUrl = isImg
+          ? `${API}/catalog/source?file=${encodeURIComponent(c.source_file)}`
+          : null;
+        return (
+          <details key={key}>
+            <summary>
+              <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                <strong>{c.source_file}</strong>
+              </span>
+              <span style={{fontSize:11,color:"#9a9a9a",marginRight:10}}>{c.component_type || "—"}</span>
+              <span style={{fontSize:11,color:"#9a9a9a",marginRight:10}}>
+                {c.material || "—"} · ${c.avg_cost_usd ?? "—"}
+              </span>
+              <button
+                className="row-delete"
+                onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); deleteOne("component", c.id); }}
+                disabled={busyId===key}
+              >
+                {busyId===key ? "Deleting…" : "Delete"}
+              </button>
+              <span className="summ-arrow" />
+            </summary>
+            <div className="detail-body">
+              <div className="meta-grid">
+                <div><span className="k">id</span>{c.id}</div>
+                <div><span className="k">component_type</span>{c.component_type || "—"}</div>
+                <div><span className="k">material</span>{c.material || "—"}</div>
+                <div><span className="k">size</span>{c.size_category || "—"}</div>
+                <div><span className="k">min $</span>{c.min_cost_usd ?? "—"}</div>
+                <div><span className="k">max $</span>{c.max_cost_usd ?? "—"}</div>
+                <div><span className="k">avg $</span>{c.avg_cost_usd ?? "—"}</div>
+                <div><span className="k">process</span>{c.manufacturing_process || "—"}</div>
+                <div><span className="k">confidence</span>{c.confidence ?? "—"}</div>
+                <div><span className="k">low_conf</span>{c.low_confidence ?? 0}</div>
+                <div><span className="k">created</span>{c.created_at || "—"}</div>
+              </div>
+            </div>
+            {previewUrl && (
+              <div className="source-preview">
+                <img
+                  src={previewUrl}
+                  alt={`Preview of ${c.source_file}`}
+                  loading="lazy"
+                  onError={(e)=>{ e.currentTarget.style.display='none'; }}
+                />
+                <a className="source-link" href={previewUrl} target="_blank" rel="noreferrer">Open source ↗</a>
+              </div>
+            )}
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Structured ──────────────────────────────────────────────────────────────
+const STRUCT_EX = [
+  "Which components use HSLA steel with avg cost over $30?",
+  "Which people appear in more than one document?",
+  "List all components with low confidence classification",
+  "Show all financial report summaries",
+];
+
+function StructuredTab() {
+  const [question, setQuestion] = React.useState("");
+  const [loading,  setLoading]  = React.useState(false);
+  const [data,     setData]     = React.useState(null);
+  const [error,    setError]    = React.useState(null);
+
+  async function run() {
+    if (!question.trim()) return;
+    setLoading(true); setError(null); setData(null);
+    try {
+      const r = await fetch(`${API}/query/structured`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ question }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setData(await r.json());
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  const rows = data?.result || [];
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+
+  return (
+    <div>
+      <p className="panel-title serif">Natural Language → SQL</p>
+      <p className="panel-sub">Queries the SQLite database directly — documents, entities, components</p>
+
+      <input type="text" value={question}
+        onChange={e=>setQuestion(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&run()}
+        placeholder="e.g. Which components use HSLA steel?" />
+
+      <div className="pills">
+        {STRUCT_EX.map((ex,i)=>(
+          <button key={i} className="pill" onClick={()=>setQuestion(ex)}>{ex}</button>
+        ))}
+      </div>
+
+      <button className="btn-primary" onClick={run} disabled={loading||!question.trim()}>
+        {loading ? <><Spinner/>Generating SQL…</> : "Run Query"}
+      </button>
+
+      {error && <Alert type="error">Request failed: {error}</Alert>}
+
+      {data && (
+        <div style={{marginTop:28}}>
+          {data.assumption && <Alert type="info"><strong>Assumption:</strong> {data.assumption}</Alert>}
+          {data.error ? (
+            <Alert type="error">{data.error}</Alert>
+          ) : (
+            <>
+              {data.sql && (
+                <details open style={{marginBottom:16}}>
+                  <summary>
+                    <span className="label" style={{marginBottom:0}}>Generated SQL</span>
+                    <span className="summ-arrow" />
+                  </summary>
+                  <pre className="sql-block">{data.sql}</pre>
+                </details>
+              )}
+              {rows.length > 0 ? (
+                <>
+                  <div className="table-wrap">
+                    <table className="result-table">
+                      <thead>
+                        <tr>{cols.map(c=><th key={c}>{c}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row,i)=>(
+                          <tr key={i}>{cols.map(c=><td key={c}>{String(row[c]??"")}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="table-count">{rows.length} row(s) returned</p>
+                </>
+              ) : (
+                !data.error && <Alert type="warning">Query returned no rows.</Alert>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Analytical ──────────────────────────────────────────────────────────────
+const RAG_EX = [
+  "What sanitization approach was decided — does it align with the data handling policy?",
+  "Which Sprint 8 blockers relate to open risks from the design review?",
+  "Compare top-ranked ideas against tear-down cost findings",
+  "What is the company's stock price?",
+];
+
+function AnalyticalTab() {
+  const [question, setQuestion] = React.useState("");
+  const [loading,  setLoading]  = React.useState(false);
+  const [data,     setData]     = React.useState(null);
+  const [error,    setError]    = React.useState(null);
+
+  async function run() {
+    if (!question.trim()) return;
+    setLoading(true); setError(null); setData(null);
+    try {
+      const r = await fetch(`${API}/query/analytical`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ question }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setData(await r.json());
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  const confClass = { high:"conf-high", medium:"conf-medium", low:"conf-low", none:"conf-none" };
+
+  return (
+    <div>
+      <p className="panel-title serif">Analytical Query</p>
+      <p className="panel-sub">Retrieves relevant chunks &amp; component data, then reasons with the LLM</p>
+
+      <input type="text" value={question}
+        onChange={e=>setQuestion(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&run()}
+        placeholder="e.g. What sanitization approach was decided?" />
+
+      <div className="pills">
+        {RAG_EX.map((ex,i)=>(
+          <button key={i} className="pill" onClick={()=>setQuestion(ex)}>{ex}</button>
+        ))}
+      </div>
+
+      <button className="btn-primary" onClick={run} disabled={loading||!question.trim()}>
+        {loading ? <><Spinner/>Reasoning…</> : "Ask"}
+      </button>
+
+      {error && <Alert type="error">Request failed: {error}</Alert>}
+
+      {data && (
+        <div style={{marginTop:28,display:"flex",flexDirection:"column",gap:20}}>
+          {data.error ? (
+            <Alert type="error">{data.error}</Alert>
+          ) : (
+            <>
+              {data.confidence && (
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span className="label" style={{marginBottom:0}}>Confidence</span>
+                  <span className={`${confClass[data.confidence]||""}`}
+                    style={{fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase"}}>
+                    {data.confidence.toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {data.grounding_warning && <Alert type="warning">{data.grounding_warning}</Alert>}
+
+              <div>
+                <p className="label">Answer</p>
+                <div className="answer-card">
+                  <p className="answer-text">{data.answer || "—"}</p>
+                </div>
+              </div>
+
+              {data.sources?.length > 0 && (
+                <div>
+                  <p className="label">Sources</p>
+                  {data.sources.map((s,i)=>{
+                    const score = s.score ?? s._distance;
+                    const file  = s.file || "unknown";
+                    const page  = s.page;
+                    const ext   = (file.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+                    const isImg = [".png",".jpg",".jpeg",".gif",".webp"].includes(ext);
+                    const isPdf = ext === ".pdf";
+                    let previewUrl = null;
+                    if (isPdf && page)      previewUrl = `${API}/catalog/source?file=${encodeURIComponent(file)}&page=${page}`;
+                    else if (isImg)         previewUrl = `${API}/catalog/source?file=${encodeURIComponent(file)}`;
+                    return (
+                      <details key={i}>
+                        <summary>
+                          <span style={{color:"#9a9a9a",fontSize:12,flexShrink:0}}>↗</span>
+                          <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{file}</span>
+                          {page!=null && <span style={{fontSize:11,color:"#555",marginRight:8,fontWeight:600}}>p.{page}</span>}
+                          {score!=null && <span style={{fontSize:11,color:"#9a9a9a",marginRight:8}}>{Number(score).toFixed(3)}</span>}
+                          <span className="summ-arrow" />
+                        </summary>
+                        <div className="detail-body" style={{fontStyle:"italic"}}>
+                          "{s.excerpt||""}"
+                        </div>
+                        {previewUrl && (
+                          <div className="source-preview">
+                            <img
+                              src={previewUrl}
+                              alt={`Preview of ${file}${page?` page ${page}`:""}`}
+                              loading="lazy"
+                              onError={(e)=>{ e.currentTarget.style.display='none'; }}
+                            />
+                            <a className="source-link" href={previewUrl} target="_blank" rel="noreferrer">
+                              Open full size ↗
+                            </a>
+                          </div>
+                        )}
+                      </details>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── App shell ────────────────────────────────────────────────────────────────
+const TABS = [
+  { id:"ingest",     label:"Ingest",      Component:IngestTab },
+  { id:"catalog",    label:"Marketplace", Component:CatalogTab },
+  { id:"structured", label:"SQL Query",   Component:StructuredTab },
+  { id:"analytical", label:"Analytical",  Component:AnalyticalTab },
+];
+
+function App() {
+  const [tab,    setTab]    = React.useState("ingest");
+  const [health, setHealth] = React.useState(null);
+
+  React.useEffect(()=>{
+    fetch(`${API}/health`,{ signal: AbortSignal.timeout(3000) })
+      .then(r=>setHealth(r.ok))
+      .catch(()=>setHealth(false));
+  },[]);
+
+  const { Component } = TABS.find(t=>t.id===tab);
+
+  return (
+    <>
+      <header>
+        <div style={{display:"flex",alignItems:"center"}}>
+          <span className="logo-kearney">KEARNEY</span>
+          <span className="logo-sep" />
+          <span className="logo-perlab">PERLab</span>
+        </div>
+        <div className="status-badge">
+          {health===null && <><span className="spinner" style={{width:10,height:10,borderWidth:1.5}} /><span style={{color:"#9a9a9a"}}>Connecting</span></>}
+          {health===true  && <><span className="dot" style={{background:"#1a6e2e"}} /><span style={{color:"#1a6e2e"}}>Connected</span></>}
+          {health===false && <><span className="dot" style={{background:"#cc0000"}} /><span style={{color:"#cc0000"}}>Offline</span></>}
+        </div>
+      </header>
+
+      <div className="hero">
+        <div>
+          <p className="hero-eyebrow">Document Intelligence Platform</p>
+          <h1 className="hero-title">Making products.<br /><em>Better.</em></h1>
+        </div>
+        <div className="hero-meta">
+          <div>OCR / PDF — Groq Vision + Docling</div>
+          <div>Text LLM — Groq (env-configured)</div>
+          <div>Embeddings — all-MiniLM-L6-v2</div>
+        </div>
+      </div>
+
+      <div className="tab-bar">
+        {TABS.map(t=>(
+          <button key={t.id} className={`tab-btn${tab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <main>
+        <Component />
+      </main>
+
+      <footer>
+        <span className="footer-copy">© Kearney PERLab</span>
+        <span className="footer-api">{API}</span>
+      </footer>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
