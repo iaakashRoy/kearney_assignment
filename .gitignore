@@ -23,6 +23,10 @@ platform_sources/
 data/
 *.db
 *.sqlite
+# Logs
+logs/
+*.log
+
 # Editor / OS noise
 .DS_Store
 .vscode/
